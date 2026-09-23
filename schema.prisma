@@ -1,0 +1,154 @@
+// =========================================
+// SKYTEN BACKEND - PRISMA SCHEMA
+// Run `npx prisma migrate dev --name init` after filling in .env
+// =========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------
+// ENUMS
+// -----------------------------------------
+
+// Top-level access control role (used by JWT/RBAC middleware)
+enum UserRole {
+  CLIENT
+  TEAM_MEMBER
+  ADMIN
+}
+
+// Skyten's 6 internal disciplines - a team member can hold more than one
+enum TeamSkill {
+  UI_UX
+  FRONTEND
+  BACKEND
+  DATA_ANALYTICS
+  CONTENT_CREATION
+  NETWORK_MARKETING
+}
+
+// Lifecycle of a client's project/bid request
+enum ProjectStatus {
+  PENDING     // just submitted by client, awaiting internal review
+  ACCEPTED    // approved by an Admin
+  REJECTED    // declined by an Admin
+  IN_PROGRESS // work has started (tasks being assigned/worked)
+  COMPLETED   // delivered
+  CANCELLED   // stopped after acceptance
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  BLOCKED
+}
+
+// Direction of a financial ledger entry
+enum TransactionType {
+  MONEY_IN   // client payments
+  MONEY_OUT  // payouts / expenses
+}
+
+enum TransactionCategory {
+  CLIENT_PAYMENT
+  TEAM_PAYOUT
+  EXPENSE
+  REFUND
+  OTHER
+}
+
+// -----------------------------------------
+// MODELS
+// -----------------------------------------
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  password      String     // bcrypt hash - never store plain text
+  fullName      String
+  role          UserRole   @default(CLIENT)
+
+  // Only meaningful for TEAM_MEMBER users - which of the 6 disciplines they cover
+  skills        TeamSkill[]
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  projectsAsClient   Project[]     @relation("ClientProjects")
+  tasksAssigned      Task[]        @relation("AssignedTasks")
+  ledgerEntriesMade  LedgerEntry[] @relation("RecordedBy")
+
+  @@map("users")
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  title        String
+  description  String
+  budget       Decimal       @db.Decimal(12, 2)
+  status       ProjectStatus @default(PENDING)
+
+  // The client who submitted this bid/request
+  client       User          @relation("ClientProjects", fields: [clientId], references: [id])
+  clientId     String
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  tasks         Task[]
+  ledgerEntries LedgerEntry[]
+
+  @@map("projects")
+}
+
+model Task {
+  id           String     @id @default(uuid())
+  title        String
+  description  String?
+  status       TaskStatus @default(TODO)
+  dueDate      DateTime?
+
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId    String
+
+  // Internal team member this task is assigned to
+  assignedTo   User?      @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  assignedToId String?
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("tasks")
+}
+
+// Financial Ledger - single table tracks both Money IN (client payments)
+// and Money OUT (payouts/expenses), distinguished by `type`.
+model LedgerEntry {
+  id          String               @id @default(uuid())
+  type        TransactionType
+  category    TransactionCategory
+  amount      Decimal              @db.Decimal(12, 2)
+  description String?
+
+  // Optional link back to the project this transaction relates to
+  project     Project?             @relation(fields: [projectId], references: [id])
+  projectId   String?
+
+  // Which Admin/team member recorded this entry (audit trail)
+  recordedBy   User                @relation("RecordedBy", fields: [recordedById], references: [id])
+  recordedById String
+
+  createdAt   DateTime             @default(now())
+
+  @@map("ledger_entries")
+}
