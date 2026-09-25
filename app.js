@@ -8,9 +8,20 @@ const cors = require("cors");
 const app = express();
 
 // --- Core middleware ---
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://skyten-dashboard.vercel.app'
+];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "*", // lets your Frontend dev's app call this API
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );
