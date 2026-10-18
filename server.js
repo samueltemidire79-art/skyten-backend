@@ -48,3 +48,24 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
 });
+// ==========================================
+// SUPABASE DATABASE KEEP-ALIVE PING
+// ==========================================
+async function keepSupabaseAlive() {
+    try {
+        // Query 1 row using Prisma (or Supabase client) to generate DB traffic
+        await prisma.bloom_beads_orders.findFirst({
+            select: { id: true }
+        });
+        console.log('⚡ Supabase keep-alive ping successful at:', new Date().toISOString());
+    } catch (err) {
+        console.error('⚠️ Keep-alive ping error:', err.message || err);
+    }
+}
+
+// Ping Supabase once when the server boots up
+keepSupabaseAlive();
+
+// Repeat the ping every 3 days (in milliseconds)
+const THREE_DAYS_IN_MS = 3 * 24 * 60 * 60 * 1000;
+setInterval(keepSupabaseAlive, THREE_DAYS_IN_MS);
