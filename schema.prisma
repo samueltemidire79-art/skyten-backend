@@ -152,3 +152,27 @@ model LedgerEntry {
 
   @@map("ledger_entries")
 }
+enum UserStatus {
+  PENDING   // just signed up, awaiting Tobi's approval
+  ACTIVE    // approved, can log in
+  REJECTED  // declined — kept for record, blocked from login
+}
+
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String
+  fullName    String
+  role        UserRole     @default(TEAM_MEMBER)
+  status      UserStatus   @default(PENDING)   // NEW
+  jobTitle    String?      // NEW — e.g. "CTO · Backend / Supabase"
+  skills      TeamSkill[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  projectsAsClient Project[] @relation("ClientProjects")
+  tasksAssigned    Task[]    @relation("AssignedTasks")
+  ledgerEntriesMade LedgerEntry[] @relation("RecordedBy")
+
+  @@map("users")
+}

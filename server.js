@@ -69,3 +69,36 @@ keepSupabaseAlive();
 // Repeat the ping every 3 days (in milliseconds)
 const THREE_DAYS_IN_MS = 3 * 24 * 60 * 60 * 1000;
 setInterval(keepSupabaseAlive, THREE_DAYS_IN_MS);
+
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+const authRoutes = require('./routes/auth'); // assuming auth routes are placed there
+
+const app = express();
+
+// Security HTTP headers
+app.use(helmet());
+
+// CORS Configuration
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://skyten-dashboard.vercel.app'
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
+
+app.use(express.json());
+
+// Mount routes
+app.use('/api/auth', authRoutes);
+
